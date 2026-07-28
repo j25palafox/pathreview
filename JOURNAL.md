@@ -74,12 +74,14 @@ The issue does not identify another unresolved GitHub issue or pull request that
 This issue is a good fit for my current experience and the Module 3 timeline. I understand the incorrect behavior, have identified the affected area of the codebase, can describe the expected before-and-after behavior, and have a reasonable starting point for reproducing and testing the bug. The Tier 1 scope is appropriately focused for a first contribution to PathReview, so I am comfortable proceeding with Issue #43.
 
 
-## Week 8 investigation note — Issue #43 feature gap
+## Week 8 — Reproduction & solution planning
 
-I traced review creation from `create_review_endpoint()` in `api/routes/reviews.py` to `process_review()` in `core/services/review_service.py`. The normal review-processing path currently calls `_run_agent_orchestration()`, which returns a hardcoded result instead of constructing and invoking `agent/orchestrator.py::Orchestrator`.
+**Reproduction commit link:** [Document review orchestration feature gap](https://github.com/j25palafox/pathreview/commit/f852ec9)
 
-This prevents Issue #43 from being reproduced through the browser or API because newly created reviews do not currently reach the agent session-management code. In the isolated orchestrator code, `Orchestrator.__init__()` creates one `ContextManager` that persists across repeated calls to `run()`, and `run()` does not receive a `review_id`. Redis-backed session state is also read and written using only `profile_id`, so the current agent design does not isolate state by individual review.
+**Reproduction summary:**
+I traced review creation from `create_review_endpoint()` through `process_review()` and found that `_run_agent_orchestration()` currently returns hardcoded output instead of invoking the real `Orchestrator`, preventing an end-to-end reproduction through the application. In the isolated orchestrator code, I observed that one persistent `ContextManager` is reused across `run()` calls and that Redis session state is keyed only by `profile_id`, so separate reviews are not isolated by a review identifier.
 
-### Reproduction commit link:
+**PLAN.md link:** [PLAN.md](https://github.com/j25palafox/pathreview/blob/fix/43-clear-agent-session-state/PLAN.md)
 
-https://github.com/j25palafox/pathreview/commit/f852ec9
+**Blockers or open questions:**
+I still need to confirm whether the intended fix is to reset context on every call to `Orchestrator.run()`, add a `review_id` to the orchestration and session APIs, or instantiate a new orchestrator for each review. I also need to determine whether replacing the placeholder implementation in `core/services/review_service.py` belongs within Issue #43 or should be handled as separate integration work.
