@@ -80,4 +80,6 @@ I traced review creation from `create_review_endpoint()` in `api/routes/reviews.
 
 This prevents Issue #43 from being reproduced through the browser or API because newly created reviews do not currently reach the agent session-management code. In the isolated orchestrator code, `Orchestrator.__init__()` creates one `ContextManager` that persists across repeated calls to `run()`, and `run()` does not receive a `review_id`. Redis-backed session state is also read and written using only `profile_id`, so the current agent design does not isolate state by individual review.
 
+### Reproduction commit link:
 
+https://github.com/j25palafox/pathreview/commit/f852ec9
