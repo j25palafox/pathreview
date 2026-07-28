@@ -72,3 +72,12 @@ The issue does not identify another unresolved GitHub issue or pull request that
 #### Verdict
 
 This issue is a good fit for my current experience and the Module 3 timeline. I understand the incorrect behavior, have identified the affected area of the codebase, can describe the expected before-and-after behavior, and have a reasonable starting point for reproducing and testing the bug. The Tier 1 scope is appropriately focused for a first contribution to PathReview, so I am comfortable proceeding with Issue #43.
+
+
+## Week 8 investigation note — Issue #43 feature gap
+
+I traced review creation from `create_review_endpoint()` in `api/routes/reviews.py` to `process_review()` in `core/services/review_service.py`. The normal review-processing path currently calls `_run_agent_orchestration()`, which returns a hardcoded result instead of constructing and invoking `agent/orchestrator.py::Orchestrator`.
+
+This prevents Issue #43 from being reproduced through the browser or API because newly created reviews do not currently reach the agent session-management code. In the isolated orchestrator code, `Orchestrator.__init__()` creates one `ContextManager` that persists across repeated calls to `run()`, and `run()` does not receive a `review_id`. Redis-backed session state is also read and written using only `profile_id`, so the current agent design does not isolate state by individual review.
+
+
