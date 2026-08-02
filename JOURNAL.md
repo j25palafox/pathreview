@@ -85,3 +85,25 @@ I traced review creation from `create_review_endpoint()` through `process_review
 
 **Blockers or open questions:**
 I still need to confirm whether the intended fix is to reset context on every call to `Orchestrator.run()`, add a `review_id` to the orchestration and session APIs, or instantiate a new orchestrator for each review. I also need to determine whether replacing the placeholder implementation in `core/services/review_service.py` belongs within Issue #43 or should be handled as separate integration work.
+
+
+## Week 9 — Solution building & PR submission
+
+### Check-in 1 (mid-week)
+
+**Current progress:**
+I completed the first two sub-tasks from `PLAN.md`. I wrote a focused regression test in `tests/unit/test_orchestrator.py` using one `Orchestrator` instance and the existing deterministic `ReadmeScorer` tool. The test calls `run()` twice for the same profile with identical input and spies on `ReadmeScorer.execute()`.
+
+The test asserts that the tool should execute twice, once for each review. It currently fails as expected because `execute()` is called only once. The test output shows a cache miss during the first run and a cache hit during the second run, confirming that the persistent in-memory `ContextManager` reuses the previous tool result across review boundaries.
+
+**Next steps:**
+Next, I will complete the remaining sub-tasks from `PLAN.md`:
+
+3. Add an explicit review-boundary reset for the in-memory context while preserving memoization between tools during a single review.
+
+4. Trace all `SessionStore` callers to determine the intended Redis session behavior before deciding whether to clear the previous profile session or use a review-specific session identifier.
+
+5. Rerun the focused regression test after the fix, then run the repository’s full unit-test suite to confirm that a second review executes its tools again without introducing unrelated failures.
+
+**Blockers:**
+No immediate blocker to implementing the in-memory context reset. The investigation also revealed separate session-store and orchestration behavior that may be relevant to the broader issue, but I will keep that work scoped separately until the focused in-memory regression is fixed and verified.
