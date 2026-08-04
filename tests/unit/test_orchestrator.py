@@ -17,13 +17,16 @@ class TestOrchestrator:
     def test_second_review_does_not_retain_previous_tool_results(self) -> None:
         """Test that a new review does not retain obsolete tool results."""
 
+        # Simulate Redis storage shared across separate review sessions.
         stored_sessions = {}
 
         redis_client = MagicMock()
 
+        # Store serialized session data using the same key behavior as Redis.
         def setex(key: str, ttl_seconds: int, value: str) -> None:
             stored_sessions[key] = value
 
+        # Return previously stored session data for the requested Redis key.
         def get(key: str) -> str | None:
             return stored_sessions.get(key)
 
@@ -32,11 +35,13 @@ class TestOrchestrator:
 
         session_store = SessionStore(redis_client)
 
+        # Use real tools so each review produces a genuine tool result.
         tools = {
             "readme_scorer": ReadmeScorer(),
             "tech_detector": TechDetector(),
         }
 
+        # Run the first review and persist its README scoring result.
         first_orchestrator = Orchestrator(
             tools=tools,
             session_store=session_store,
@@ -59,9 +64,11 @@ class TestOrchestrator:
 
         first_session = session_store.get("profile-123")
 
+        # Confirm the first review stored only its own tool result.
         assert first_session is not None
         assert set(first_session) == {"readme_scorer"}
 
+        # Simulate a later review for the same profile using a new orchestrator.
         second_orchestrator = Orchestrator(
             tools=tools,
             session_store=session_store,
@@ -96,5 +103,6 @@ class TestOrchestrator:
 
         second_session = session_store.get("profile-123")
 
+        # The new review must replace, not merge with, the previous review state.
         assert second_session is not None
         assert set(second_session) == {"tech_detector"}
