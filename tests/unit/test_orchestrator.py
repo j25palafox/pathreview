@@ -1,38 +1,100 @@
-"""Tests for orchestrator.py"""
+"""Tests for orchestrator.py."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from agent.memory.session_store import SessionStore
 from agent.orchestrator import Orchestrator
 from agent.tools.readme_scorer import ReadmeScorer
+from agent.tools.tech_detector import TechDetector
 
 
 @pytest.mark.unit
 class TestOrchestrator:
-    """Test Suite for Orchestrator agent."""
+    """Test suite for Orchestrator agent."""
 
-    def test_tool_executes_again_for_second_review(self) -> None:
-        """Test that a new review does not reuse a previous tool result."""
+    def test_second_review_does_not_retain_previous_tool_results(self) -> None:
+        """Test that a new review does not retain obsolete tool results."""
 
-        readme_scorer = ReadmeScorer()
-        orchestrator = Orchestrator(
-            tools={
-                "readme_scorer": readme_scorer,
-            }
-        )
+        stored_sessions = {}
 
-        profile_data = {
-            "readme_content": "# Portfolio\nA sample portfolio README.",
+        redis_client = MagicMock()
+
+        def setex(key: str, ttl_seconds: int, value: str) -> None:
+            stored_sessions[key] = value
+
+        def get(key: str) -> str | None:
+            return stored_sessions.get(key)
+
+        redis_client.setex.side_effect = setex
+        redis_client.get.side_effect = get
+
+        session_store = SessionStore(redis_client)
+
+        tools = {
+            "readme_scorer": ReadmeScorer(),
+            "tech_detector": TechDetector(),
         }
 
-        with patch.object(
-            readme_scorer,
-            "execute",
-            wraps=readme_scorer.execute,
-        ) as mock_execute:
-            # Simulate two separate reviews within the same orchestrator session
-            orchestrator.run("profile-123", profile_data)
-            orchestrator.run("profile-123", profile_data)
+        first_orchestrator = Orchestrator(
+            tools=tools,
+            session_store=session_store,
+        )
 
-        assert mock_execute.call_count == 2
+        with patch.object(
+            first_orchestrator,
+            "_build_plan",
+            return_value=[
+                (
+                    "readme_scorer",
+                    {"readme_content": "# Portfolio\nOriginal README."},
+                ),
+            ],
+        ):
+            first_orchestrator.run(
+                "profile-123",
+                {"readme_content": "# Portfolio\nOriginal README."},
+            )
+
+        first_session = session_store.get("profile-123")
+
+        assert first_session is not None
+        assert set(first_session) == {"readme_scorer"}
+
+        second_orchestrator = Orchestrator(
+            tools=tools,
+            session_store=session_store,
+        )
+
+        with patch.object(
+            second_orchestrator,
+            "_build_plan",
+            return_value=[
+                (
+                    "tech_detector",
+                    {
+                        "files": [
+                            "src/main.py",
+                            "requirements.txt",
+                            "Dockerfile",
+                        ],
+                    },
+                ),
+            ],
+        ):
+            second_orchestrator.run(
+                "profile-123",
+                {
+                    "files": [
+                        "src/main.py",
+                        "requirements.txt",
+                        "Dockerfile",
+                    ],
+                },
+            )
+
+        second_session = session_store.get("profile-123")
+
+        assert second_session is not None
+        assert set(second_session) == {"tech_detector"}
