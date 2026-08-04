@@ -107,3 +107,19 @@ Next, I will complete the remaining sub-tasks from `PLAN.md`:
 
 **Blockers:**
 No immediate blocker to implementing the in-memory context reset. The investigation also revealed separate session-store and orchestration behavior that may be relevant to the broader issue, but I will keep that work scoped separately until the focused in-memory regression is fixed and verified.
+
+### Check-in 2 (end of week)
+
+**PR link:** https://github.com/ascherj/pathreview/pull/752
+
+**Branch:** `fix/43-clear-agent-session-state`
+
+**What you built:**
+I updated the orchestrator so that every new portfolio review begins with fresh in-memory context and session state instead of retaining obsolete tool results from an earlier review for the same profile. The change preserves tool-result caching within the current review while preventing results from one review from appearing in the next.
+
+**Tests added or updated:**
+Updated `tests/unit/test_orchestrator.py`. The regression test simulates Redis-backed session persistence across two separate `Orchestrator` instances for the same profile: the first review runs `ReadmeScorer`, the second runs `TechDetector`, and the test confirms that the second review contains its new result without retaining the first review's `readme_scorer` result.
+
+**Self-review confirmation:** [x] make check passes  [x] make test-unit passes
+
+**Draft PR feedback received from:** none
